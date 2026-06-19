@@ -335,12 +335,50 @@ def load_t2_model(base_dir: str = "."):
     feature_cols : list[str]
         Ordered feature column names expected by the model.
     """
+    # Resolve project root from this file's location (utils/ -> project root)
+    _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # --- Locate model checkpoint ---
+    model_candidates = [
+        os.path.join(base_dir, "T2", "nexus_rt_v1.pth"),
+        os.path.join(_project_root, "T2", "nexus_rt_v1.pth"),
+    ]
+    model_path = None
+    for path in model_candidates:
+        if os.path.isfile(path):
+            model_path = path
+            break
+
+    if model_path is None:
+        raise FileNotFoundError(
+            f"Cannot find nexus_rt_v1.pth.\n"
+            f"Searched:\n  " + "\n  ".join(model_candidates) + "\n"
+            f"Project root detected: {_project_root}\n"
+            f"Contents of project root: {os.listdir(_project_root)}"
+        )
+
+    # --- Locate dataset CSV ---
+    data_candidates = [
+        os.path.join(base_dir, "T2", "Dataset", "Sample - Superstore.csv"),
+        os.path.join(_project_root, "T2", "Dataset", "Sample - Superstore.csv"),
+    ]
+    data_path = None
+    for path in data_candidates:
+        if os.path.isfile(path):
+            data_path = path
+            break
+
+    if data_path is None:
+        raise FileNotFoundError(
+            f"Cannot find Sample - Superstore.csv.\n"
+            f"Searched:\n  " + "\n  ".join(data_candidates) + "\n"
+            f"Project root detected: {_project_root}"
+        )
+
     # Load checkpoint
-    model_path = os.path.join(base_dir, "T2", "nexus_rt_v1.pth")
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
 
     # Replicate the data pipeline to recover scaler & encoders
-    data_path = os.path.join(base_dir, "T2", "Dataset", "Sample - Superstore.csv")
     scaler, label_encoders, feature_cols, subcat_names, states, _full_data = (
         _replicate_prepare_data(data_path)
     )
@@ -360,6 +398,7 @@ def load_t2_model(base_dir: str = "."):
     # Stash states and full_data reference on the function for helpers
     load_t2_model._states = states
     load_t2_model._full_data = _full_data
+    load_t2_model._project_root = _project_root
 
     return model, scaler, label_encoders, subcat_names, feature_cols
 
@@ -457,12 +496,17 @@ def predict_transaction(
             pass  # just need the structure
 
         # Re-read raw data and append inference row
-        data_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "T2", "Dataset", "Sample - Superstore.csv"
-        )
-        if os.path.exists(data_path):
-            raw_df = pd.read_csv(data_path, encoding="latin1")
+        _project_root = getattr(load_t2_model, "_project_root",
+                                os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        data_candidates = [
+            os.path.join(_project_root, "T2", "Dataset", "Sample - Superstore.csv"),
+        ]
+        raw_df = None
+        for dp in data_candidates:
+            if os.path.exists(dp):
+                raw_df = pd.read_csv(dp, encoding="latin1")
+                break
+        if raw_df is not None:
             combined_df = pd.concat([raw_df, single_df], ignore_index=True)
         else:
             combined_df = single_df

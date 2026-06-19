@@ -123,7 +123,29 @@ def load_t1_model(base_dir: str = "."):
         Full checkpoint dict containing scaler_mean, scaler_scale,
         features, features_engineered, input_dim, hidden_dim, etc.
     """
-    model_path = os.path.join(base_dir, "T1", "saved_model", "boston_housing_model.pth")
+    # Resolve project root from this file's location (utils/ -> project root)
+    _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Try multiple path strategies for Streamlit Cloud compatibility
+    candidates = [
+        os.path.join(base_dir, "T1", "saved_model", "boston_housing_model.pth"),
+        os.path.join(_project_root, "T1", "saved_model", "boston_housing_model.pth"),
+    ]
+
+    model_path = None
+    for path in candidates:
+        if os.path.isfile(path):
+            model_path = path
+            break
+
+    if model_path is None:
+        raise FileNotFoundError(
+            f"Cannot find boston_housing_model.pth.\n"
+            f"Searched:\n  " + "\n  ".join(candidates) + "\n"
+            f"Project root detected: {_project_root}\n"
+            f"Contents of project root: {os.listdir(_project_root)}"
+        )
+
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
 
     model = BostonHousingNet(
