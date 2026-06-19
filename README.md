@@ -1,4 +1,4 @@
-# MetaMavericks — Unified AI/ML Model Hub
+# Shadowfox — Unified AI/ML Model Hub
 
 Welcome to the **Unified AI Model Hub**, a premium AI/ML portfolio project showcasing high-performance deep learning models for regression, multi-task classification, and Natural Language Processing (NLP). 
 
